@@ -29,6 +29,8 @@ class GridBaseEnv(Env):
         self.n_rows = n_rows  # Number of rows
         self.n_columns = n_columns  # Number of columns
 
+        self.pybullet_floor_id
+
         self.smooth_movement = smooth_movement
         self.render_mode = render_mode
         
@@ -207,17 +209,20 @@ class GridBaseEnv(Env):
         Returns:
         - None
         """
+        if hasattr(self, 'pybullet_floor_id'):
+        # Si el piso ya existe, elimínalo para redibujarlo
+            p.removeBody(self.pybullet_floor_id)
 
         half_height = self.floor_height / 2.0
         pos_x = self.n_columns / 2 - 1
         pos_y = self.n_rows / 2 - 1
-        color = [0, 0.4, 0, 0.8]  # Green color
+        rgbaColor=[0.2, 0.2, 0.8, 0.8]  # Green color
 
         # Create visual shape for the floow
         visual_shape_id = p.createVisualShape(
             shapeType=p.GEOM_BOX,
             halfExtents=[self.n_columns / 2, self.n_rows / 2, half_height],
-            rgbaColor=color,
+            rgbaColor=rgbaColor,
             specularColor=[0, 0, 0]
         )
 
@@ -228,7 +233,7 @@ class GridBaseEnv(Env):
         )
 
         # Create the multi-body object
-        perimeter_id = p.createMultiBody(
+        self.pybullet_floor_id = p.createMultiBody(
             baseMass=0,  # Static object
             baseCollisionShapeIndex=collision_shape_id,
             baseVisualShapeIndex=visual_shape_id,

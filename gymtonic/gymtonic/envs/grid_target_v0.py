@@ -17,17 +17,40 @@ class GridTargetEnv(GridBaseEnv):
         smooth_movement (bool): Flag indicating whether smooth movement is enabled. Default is False.
         render_mode (str): Rendering mode for visualization. Default is None.
     """
+    def calculate_manhattan(self, agent_pos, target_pos):
+         return np.abs(agent_pos[0] - target_pos[0]) + np.abs(agent_pos[1] - target_pos[1])
+    
+    def calculate_euclidean(self, agent_pos, target_pos):
+        # Calcular la diferencia absoluta en las coordenadas x e y
+        diff = np.abs(agent_pos - target_pos)
+        # Aplicar la fórmula de la distancia euclidiana con diferencias absolutas
+        distance = np.linalg.norm(diff)
+
+        return distance
 
     def __init__(self, n_rows=5, n_columns=5, smooth_movement=False, render_mode=None):
         super(GridTargetEnv, self).__init__(n_rows=n_rows, n_columns=n_columns,
                                         smooth_movement=smooth_movement, render_mode=render_mode)
         
+        self.max_rows = 10  # Tamaño máximo del grid PARA SOLUCIONAR EL OBS SPACE CUANTO AUMENTEMOS EL GRID
+        self.max_columns = 10
+        self.n_rows = n_rows
+        self.n_columns = n_columns
+
         # Redefine the observation space        
         # Multidiscrete observation space of the size of the board with 3 possible values (empty, agent or target)
-        self.observation_space = spaces.MultiDiscrete(np.array([3] * self.n_rows * self.n_columns, dtype=np.int32))
+        self.observation_space = spaces.MultiDiscrete(np.array([3] * self.max_rows * self.max_columns, dtype=np.int32))
         self.steps_taken = 0  # Agregar esta línea
-        self.max_steps = self.n_columns * self.n_rows
+        self.max_steps = self.max_columns * self.max_rows
         self.manhattan_to_objective = -1
+        self.score = 0
+        self.score_limit = 10 ## Intially set to 10
+        self.phase = 1
+        self.episode = 1
+        
+
+        print(f"Starting PHASE {self.phase}... Grid Size={self.n_columns}X{self.n_rows}")
+        print(f"Starting EPISODE {self.episode}...")
         
         # Initial target position
         self.target_pos = np.array([self.n_columns-1, self.n_rows-1], dtype=np.int32)
@@ -44,13 +67,23 @@ class GridTargetEnv(GridBaseEnv):
         self.agent_pos = np.array([0, 0], dtype=np.int32)
         
         self.steps_taken = 0  # RESET THE STEPS TAKEN BY THE AGENT
+        self.x_random_obj = np.random.randint(0, self.n_columns)   #  INITIALLY RANDOM
+        self.y_random_obj = np.random.randint(0, self.n_rows)
 
-        #  INITIALLY FIXED!
-        x_random = 6
-        y_random = 6
-        self.target_pos = [x_random, y_random]
+        if self.episode == 1: ### SET TO A CERTAIN POSITION
+            self.score_limit = 10
+            self.x_random_obj = self.n_columns - 1
+            self.y_random_obj = self.n_rows - 1
+
+        if self.episode == 2: ### RANDOMIZE
+            self.score_limit = 20 # We want the agent to train better in this phase because it used to go to the previous obj_position
+            self.x_random_obj = np.random.randint(0, self.n_columns)  # Genera un valor entre 0 y n_columns - 1
+            self.y_random_obj = np.random.randint(0, self.n_rows)
+
+        self.target_pos = [self.x_random_obj, self.y_random_obj]
         
-        self.manhattan_to_objective = np.abs(self.agent_pos[0] - self.target_pos[0]) + np.abs(self.agent_pos[1] - self.target_pos[1])
+        self.manhattan_to_objective_initial = self.calculate_manhattan(self.agent_pos, self.target_pos)
+        self.manhattan_to_objective_actual = self.calculate_manhattan(self.agent_pos, self.target_pos)
 
         if self.render_mode == 'human':
             self.update_visual_objects()
@@ -76,14 +109,37 @@ class GridTargetEnv(GridBaseEnv):
 
 
     def step(self, action: ActType) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
+        
         self.steps_taken += 1
         obs, reward, terminated, truncated, info = super().step(action)
         
-        reward = self.calculate_reward()  # Calcular la recompensa específica de este entorno
-
+        reward = self.calculate_reward()
+        
         if self.is_target_reached():
             terminated = True
-            print("Target reached!")
+            self.score += 1
+            print(f"Target reached! Score: {self.score}")
+
+            if self.score == self.score_limit: ## Se acabo el episodio, ha llegado al SCORE
+                self.episode += 1 # Entrar en siguente episodio
+                self.score = 0 # Score set to 0
+
+                if self.episode == 3:   # Si el episodio es 3 == EMPEZAMOS SIGUENTE PHASE + ampliar grid!
+                    self.phase += 1
+                    self.episode = 1
+                    
+                    if (self.n_columns == 9 | self.n_rows == 9):  # Limite de grid de 10x10
+                        print("ACABOOOO!")
+                        self.n_columns = 8
+                        self.n_rows = 8
+                    self.n_columns += 1   # MODIFICAMOS EL ROWS Y EL COLUMNS PERO TAMBIEN EL OBSERVATION SPACE!
+                    self.n_rows += 1
+                    super().draw_floor
+                    self.observation_space = spaces.MultiDiscrete(np.array([3] * self.n_rows * self.n_columns, dtype=np.int32))
+                    print(f"Starting PHASE {self.phase}... Grid Size={self.n_columns}X{self.n_rows}")
+                
+                print(f"Starting EPISODE {self.episode}...")
+
             self.reset()  # Reinicia el entorno si se alcanza el objetivo
 
         # Reiniciar el entorno si se supera el límite de pasos
@@ -99,26 +155,29 @@ class GridTargetEnv(GridBaseEnv):
         # Calcular la distancia de Manhattan entre el agente y el objetivo
         # Si el agente ha llegado al objetivo
         if self.is_target_reached():
-            # Recompensa alta por llegar al objetivo, penalizando por los pasos tomados
-            distance_obt = self.manhattan_to_objective + 1
-            print("STEPS TAKEN:",self.steps_taken)
-            print("distance OBT:",self.manhattan_to_objective)
-            
-            if(self.steps_taken<distance_obt):
-                print("MAXIMO REWARD!")
-                reward = 200
-            else:
-                reward = 30
+            reward = 100
 
-            
         else:
-            # Recompensa proporcional a la distancia restante para llegar al objetivo
-            reward = -1
+            real_manhattan=self.calculate_manhattan(self.agent_pos, self.target_pos)
+            
+            if self.manhattan_to_objective_actual > real_manhattan:
+                reward = 5
+                self.manhattan_to_objective_actual = real_manhattan
+
+            elif self.manhattan_to_objective_actual == real_manhattan:
+                reward = -1
+
+            else:
+                reward =-2
+                self.manhattan_to_objective_actual = real_manhattan
+
+
+        reward -= 0.1  # Penalización por cada paso para reducir ineficiencia
         return reward
 
 
     def get_observation(self):
-        observation = np.zeros((self.n_columns, self.n_rows), dtype=np.int32)
+        observation = np.zeros((self.max_columns, self.max_rows), dtype=np.int32)
         observation[self.agent_pos[0], self.agent_pos[1]] = 1
         observation[self.target_pos[0], self.target_pos[1]] = 2
         return observation.flatten()

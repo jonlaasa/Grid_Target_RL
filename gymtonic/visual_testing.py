@@ -10,7 +10,7 @@ if __name__ == "__main__":
     env = gym.make('gymtonic/GridTarget-v0', n_rows=7, n_columns=7, render_mode='human')
 
     # Especifica manualmente la ruta del modelo .zip
-    model_path = '/home/rl/gymtonic/ppo_gridd_target_model/ppo_gridd_target_model_2024-12-01_22-27-01.zip'  # Cambia esta ruta por la correcta
+    model_path = '/home/rl/2025_ReinforcementLearning/final_proyect_GridTarget/Grid_Target_RL/gymtonic/ppo_gridd_target_model/ppo_gridd_target_model_2024-12-01_22-27-01.zip'  # Cambia esta ruta por la correcta
 
     # Comprobar si el archivo existe
     if not os.path.isfile(model_path):
