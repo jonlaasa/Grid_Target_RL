@@ -134,7 +134,6 @@ class GridTargetEnv(GridBaseEnv):
                         self.n_rows = 8
                     self.n_columns += 1   # MODIFICAMOS EL ROWS Y EL COLUMNS PERO TAMBIEN EL OBSERVATION SPACE!
                     self.n_rows += 1
-                    super().draw_floor
                     self.observation_space = spaces.MultiDiscrete(np.array([3] * self.n_rows * self.n_columns, dtype=np.int32))
                     print(f"Starting PHASE {self.phase}... Grid Size={self.n_columns}X{self.n_rows}")
                 

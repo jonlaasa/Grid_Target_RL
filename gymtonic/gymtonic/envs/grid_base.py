@@ -29,7 +29,9 @@ class GridBaseEnv(Env):
         self.n_rows = n_rows  # Number of rows
         self.n_columns = n_columns  # Number of columns
 
-        self.pybullet_floor_id
+        self.max_rows = 10  
+        self.max_columns = 10
+
 
         self.smooth_movement = smooth_movement
         self.render_mode = render_mode
@@ -62,6 +64,7 @@ class GridBaseEnv(Env):
             # Load the plane and objects from the pybullet_data directory
             p.setAdditionalSearchPath(pybullet_data.getDataPath())
             self.pybullet_plane_id = p.loadURDF("plane.urdf", [self.visual_offset,self.visual_offset,0])
+            self.pybullet_floor_id = None
 
             # Draw the floor for the grid
             self.floor_height = 0.2
@@ -209,19 +212,19 @@ class GridBaseEnv(Env):
         Returns:
         - None
         """
-        if hasattr(self, 'pybullet_floor_id'):
+        if self.pybullet_floor_id != None:
         # Si el piso ya existe, elimínalo para redibujarlo
             p.removeBody(self.pybullet_floor_id)
 
         half_height = self.floor_height / 2.0
-        pos_x = self.n_columns / 2 - 1
-        pos_y = self.n_rows / 2 - 1
+        pos_x = self.max_columns / 2 - 1
+        pos_y = self.max_rows / 2 - 1
         rgbaColor=[0.2, 0.2, 0.8, 0.8]  # Green color
 
         # Create visual shape for the floow
         visual_shape_id = p.createVisualShape(
             shapeType=p.GEOM_BOX,
-            halfExtents=[self.n_columns / 2, self.n_rows / 2, half_height],
+            halfExtents=[self.max_columns / 2, self.max_rows / 2, half_height],
             rgbaColor=rgbaColor,
             specularColor=[0, 0, 0]
         )
@@ -229,7 +232,7 @@ class GridBaseEnv(Env):
         # Create collision shape for the box
         collision_shape_id = p.createCollisionShape(
             shapeType=p.GEOM_BOX,
-            halfExtents=[self.n_columns / 2, self.n_rows / 2, half_height]
+            halfExtents=[self.max_columns / 2, self.max_rows / 2, half_height]
         )
 
         # Create the multi-body object
