@@ -12,7 +12,7 @@ n_columns = 5
 env = gym.make('gymtonic/GridTarget-v0', n_rows=n_rows, n_columns=n_columns, render_mode=None)
 
 model = PPO("MlpPolicy", env, verbose=1)
-model.learn(total_timesteps=50000)
+model.learn(total_timesteps=40000)
 
 env = gym.make('gymtonic/GridTarget-v0', n_rows=n_rows, n_columns=n_columns, render_mode='human')
 env = Monitor(env)
