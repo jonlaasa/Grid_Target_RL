@@ -56,20 +56,9 @@ class GridTargetEnv(GridBaseEnv):
         self.target_pos = np.array([self.n_columns-1, self.n_rows-1], dtype=np.int32)
 
         self.number_of_obstacles = 5 # Initially set to 5
-        self.obstacles_pos = []
+        self.obstacles_pos = [(2,2), (2,5), (2,6), (6,2), (8,2)] # Initial obstacles positions RANDOMLY ASSIGNED
 
-        self.not_available = [(2,2), (2,5), (2,6), (6,2), (8,2)]
-
-        if self.phase == 6:
-            for i in range(self.number_of_obstacles):
-                x = np.random.randint(0, self.n_columns)
-                y = np.random.randint(0, self.n_rows)
-                while (x,y) in self.not_available:
-                    x = np.random.randint(0, self.n_columns)
-                    y = np.random.randint(0, self.n_rows)
-                obs_position = (x,y)    
-                self.obstacles_pos.append(obs_position)
-                self.not_available.append(obs_position)
+        self.not_available = []
 
         if self.render_mode == 'human':
             p.setAdditionalSearchPath(pybullet_data.getDataPath())        
@@ -99,8 +88,8 @@ class GridTargetEnv(GridBaseEnv):
 
         if self.episode == 1: ### SET TO A CERTAIN POSITION
             self.score_limit = 10
-            self.x_random_obj = self.n_columns - 1
-            self.y_random_obj = self.n_rows - 1
+            self.x_random_obj = self.n_columns - 8
+            self.y_random_obj = self.n_rows - 8
 
         if self.episode == 2: ### RANDOMIZE
             self.score_limit = 20 # We want the agent to train better in this phase because it used to go to the previous obj_position
@@ -110,6 +99,20 @@ class GridTargetEnv(GridBaseEnv):
         self.target_pos = [self.x_random_obj, self.y_random_obj]
 
         self.not_available.append(tuple(self.target_pos))
+
+        if self.phase >= 6:
+            if len(self.obstacles_pos) != 0:
+                self.obstacles_pos.clear()
+
+            for i in range(self.number_of_obstacles):
+                x = np.random.randint(0, self.n_columns)
+                y = np.random.randint(0, self.n_rows)
+                while (x,y) in self.not_available:
+                    x = np.random.randint(0, self.n_columns)
+                    y = np.random.randint(0, self.n_rows)
+                obs_position = (x,y)    
+                self.obstacles_pos.append(obs_position)
+                self.not_available.append(obs_position)
         
         self.manhattan_to_objective_initial = self.calculate_manhattan(self.agent_pos, self.target_pos)
         self.manhattan_to_objective_actual = self.calculate_manhattan(self.agent_pos, self.target_pos)
@@ -158,7 +161,8 @@ class GridTargetEnv(GridBaseEnv):
                     self.episode = 1
                     
                     if (self.n_columns == 9 | self.n_rows == 9):  # Limite de grid de 10x10
-                        print("OBSTACLES FASE****************************************************")
+                        print(f"OBSTACLES FASE: N = {self.number_of_obstacles} ")
+                        self.number_of_obstacles += 1
                     else:
                         self.n_columns += 1   # MODIFICAMOS EL ROWS Y EL COLUMNS PERO TAMBIEN EL OBSERVATION SPACE!
                         self.n_rows += 1
