@@ -45,7 +45,7 @@ class GridTargetEnv(GridBaseEnv):
         self.manhattan_to_objective = -1
         self.score = 0
         self.score_limit = 10 ## Intially set to 10
-        self.phase = 1
+        self.phase = 6
         self.episode = 1
         
 
@@ -55,17 +55,44 @@ class GridTargetEnv(GridBaseEnv):
         # Initial target position
         self.target_pos = np.array([self.n_columns-1, self.n_rows-1], dtype=np.int32)
 
+        self.number_of_obstacles = 5 # Initially set to 5
+        self.obstacles_pos = []
+
+        self.not_available = [(2,2), (2,5), (2,6), (6,2), (8,2)]
+
+        if self.phase == 6:
+            for i in range(self.number_of_obstacles):
+                x = np.random.randint(0, self.n_columns)
+                y = np.random.randint(0, self.n_rows)
+                while (x,y) in self.not_available:
+                    x = np.random.randint(0, self.n_columns)
+                    y = np.random.randint(0, self.n_rows)
+                obs_position = (x,y)    
+                self.obstacles_pos.append(obs_position)
+                self.not_available.append(obs_position)
+
         if self.render_mode == 'human':
             p.setAdditionalSearchPath(pybullet_data.getDataPath())        
             self.pybullet_target_id = p.loadURDF("duck_vhacd.urdf", [0, 0, 0], useFixedBase=False, globalScaling=7, baseOrientation=[0.5, 0.5, 0.5, 0.5])
             # Mass 0 for the target to avoid collision physics
             p.changeDynamics(self.pybullet_target_id, -1, mass=0)
 
+            self.obs_scale = 0.5
+            self.pybullet_obstacles = {}
+
+            if self.phase >= 6:
+                for i in range(self.number_of_obstacles):
+                    obstacle_pos = self.obstacles_pos[i]
+                    self.pybullet_obstacles[i] = p.loadURDF("cube.urdf", [obstacle_pos[0], obstacle_pos[1], self.floor_height + self.agent_scale/2], useFixedBase=False, globalScaling=self.obs_scale)
+                    p.changeVisualShape(self.pybullet_obstacles[i], -1, rgbaColor=[1, 0, 0, 1])
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[ObsType, dict[str, Any]]:
         super().reset(seed=seed)
 
         self.agent_pos = np.array([0, 0], dtype=np.int32)
-        
+
+        self.not_available.append(tuple(self.agent_pos))
+                
         self.steps_taken = 0  # RESET THE STEPS TAKEN BY THE AGENT
         self.x_random_obj = np.random.randint(0, self.n_columns)   #  INITIALLY RANDOM
         self.y_random_obj = np.random.randint(0, self.n_rows)
@@ -81,6 +108,8 @@ class GridTargetEnv(GridBaseEnv):
             self.y_random_obj = np.random.randint(0, self.n_rows)
 
         self.target_pos = [self.x_random_obj, self.y_random_obj]
+
+        self.not_available.append(tuple(self.target_pos))
         
         self.manhattan_to_objective_initial = self.calculate_manhattan(self.agent_pos, self.target_pos)
         self.manhattan_to_objective_actual = self.calculate_manhattan(self.agent_pos, self.target_pos)
@@ -129,14 +158,11 @@ class GridTargetEnv(GridBaseEnv):
                     self.episode = 1
                     
                     if (self.n_columns == 9 | self.n_rows == 9):  # Limite de grid de 10x10
-                        print("ACABOOOO!")
-                        self.n_columns = 8
-                        self.n_rows = 8
-                    self.n_columns += 1   # MODIFICAMOS EL ROWS Y EL COLUMNS PERO TAMBIEN EL OBSERVATION SPACE!
-                    self.n_rows += 1
-                    self.observation_space = spaces.MultiDiscrete(np.array([3] * self.n_rows * self.n_columns, dtype=np.int32))
+                        print("OBSTACLES FASE****************************************************")
+                    else:
+                        self.n_columns += 1   # MODIFICAMOS EL ROWS Y EL COLUMNS PERO TAMBIEN EL OBSERVATION SPACE!
+                        self.n_rows += 1
                     print(f"Starting PHASE {self.phase}... Grid Size={self.n_columns}X{self.n_rows}")
-                
                 print(f"Starting EPISODE {self.episode}...")
 
             self.reset()  # Reinicia el entorno si se alcanza el objetivo

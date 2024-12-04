@@ -6,10 +6,10 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 import gymtonic.envs
 
-n_rows = 5
-n_columns = 5
+n_rows = 10
+n_columns = 10
 
-env = gym.make('gymtonic/GridTarget-v0', n_rows=n_rows, n_columns=n_columns, render_mode=None)
+env = gym.make('gymtonic/GridTarget-v0', n_rows=n_rows, n_columns=n_columns, render_mode='human')
 
 model = PPO("MlpPolicy", env, verbose=1)
 model.learn(total_timesteps=40000)
