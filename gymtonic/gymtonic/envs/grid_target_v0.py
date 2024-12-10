@@ -144,35 +144,8 @@ class GridTargetEnv(GridBaseEnv):
         
         self.steps_taken += 1
 
-        # Copiar posición actual del agente
-        new_position = self.agent_pos.copy()
-
-        # Actualizar la posición basada en la acción
-        if action == 0:  # Arriba
-            new_position[1] += 1
-        elif action == 1:  # Derecha
-            new_position[0] += 1
-        elif action == 2:  # Abajo
-            new_position[1] -= 1
-        elif action == 3:  # Izquierda
-            new_position[0] -= 1
-
-        # Verificar límites del grid
-        if not (0 <= new_position[0] < self.n_columns and 0 <= new_position[1] < self.n_rows):
-            # Movimiento fuera de los límites
-            reward = -5  # Penalización por intentar salir del grid
-            return self.get_observation(), reward, False, False, {}
-
-        # Verificar si la nueva posición es un obstáculo
-        if tuple(new_position) in self.obstacles_pos:
-            # Acción inválida, no mover al agente
-            reward = -2  # Penalización por intentar moverse a un obstáculo
-            return self.get_observation(), reward, False, False, {}
-
-        # Si la acción es válida, actualizar posición del agente
-        self.agent_pos = new_position
-
         obs, reward, terminated, truncated, info = super().step(action)
+        
         reward = self.calculate_reward()
         
         if self.is_target_reached():
