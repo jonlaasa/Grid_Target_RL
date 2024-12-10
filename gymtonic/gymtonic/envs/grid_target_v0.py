@@ -48,15 +48,18 @@ class GridTargetEnv(GridBaseEnv):
         self.phase = 6
         self.episode = 1
         
-
         print(f"Starting PHASE {self.phase}... Grid Size={self.n_columns}X{self.n_rows}")
         print(f"Starting EPISODE {self.episode}...")
         
         # Initial target position
         self.target_pos = np.array([self.n_columns-1, self.n_rows-1], dtype=np.int32)
 
-        self.number_of_obstacles = 6 # Initially set to 6
-        self.obstacles_pos = [(2,2), (2,5), (2,6), (6,2), (8,2)] # Initial obstacles positions RANDOMLY ASSIGNED
+        self.obstacle_fase = 1 # Initially set to 1 (8 obstacles per fase)
+        self.obstacles_fixes = [(1,0),(1,1),(3,0),(3,1),(2,3),(3,3),(0,4),(0,5),(0,3),(1,3),   ### Each 10 tuples refers to each level, carefully designed
+            (2,5),(3,5),(3,7),(3,8),(1,7),(1,8),(1,9),(2,9),(5,9),(6,9),
+            (5,0),(5,1),(6,1),(7,1),(9,0),(9,1),(8,3),(9,3),(5,3),(5,4),
+            (6,3),(6,4),(8,5),(9,5),(5,6),(6,6),(6,7),(6,8),(8,7),(8,8)]
+        self.obstacles_act = []
 
         self.not_available = []
 
@@ -70,8 +73,8 @@ class GridTargetEnv(GridBaseEnv):
             self.pybullet_obstacles = {}
 
             if self.phase >= 6:
-                for i in range(self.number_of_obstacles):
-                    obstacle_pos = self.obstacles_pos[i]
+                for i in range(self.obstacle_fase * 10):
+                    obstacle_pos = self.obstacles_fixes[i]
                     self.pybullet_obstacles[i] = p.loadURDF("cube.urdf", [obstacle_pos[0], obstacle_pos[1], self.floor_height + self.agent_scale/2], useFixedBase=False, globalScaling=self.obs_scale)
                     p.changeVisualShape(self.pybullet_obstacles[i], -1, rgbaColor=[1, 0, 0, 1])
 
@@ -88,8 +91,12 @@ class GridTargetEnv(GridBaseEnv):
 
         if self.episode == 1: ### SET TO A CERTAIN POSITION
             self.score_limit = 10
-            self.x_random_obj = self.n_columns - 1
-            self.y_random_obj = self.n_rows - 1
+            if self.phase >=6:
+                self.x_random_obj = 4
+                self.y_random_obj = 5
+            else:
+                self.x_random_obj = self.n_columns - 1
+                self.y_random_obj = self.n_rows - 1
 
         if self.episode == 2: ### RANDOMIZE
             self.score_limit = 20 # We want the agent to train better in this phase because it used to go to the previous obj_position
@@ -101,18 +108,10 @@ class GridTargetEnv(GridBaseEnv):
         self.not_available.append(tuple(self.target_pos))
 
         if self.phase >= 6:
-            if len(self.obstacles_pos) != 0:
-                self.obstacles_pos.clear()
-
-            '''for i in range(self.number_of_obstacles):
-                x = np.random.randint(0, self.n_columns)
-                y = np.random.randint(0, self.n_rows)
-                while (x,y) in self.not_available:
-                    x = np.random.randint(0, self.n_columns)
-                    y = np.random.randint(0, self.n_rows)
-                obs_position = (x,y)    
-                self.obstacles_pos.append(obs_position)
-                self.not_available.append(obs_position)'''
+            for i in range(self.obstacle_fase * 10): 
+                obs_pos=self.obstacles_fixes[i] 
+                self.obstacles_act.append(obs_pos)
+                self.not_available.append(obs_pos)
         
         self.manhattan_to_objective_initial = self.calculate_manhattan(self.agent_pos, self.target_pos)
         self.manhattan_to_objective_actual = self.calculate_manhattan(self.agent_pos, self.target_pos)
@@ -139,12 +138,54 @@ class GridTargetEnv(GridBaseEnv):
         p.resetBasePositionAndOrientation(self.pybullet_target_id,[self.target_pos[0], self.target_pos[1], self.floor_height + 0.1], quaternion)
         self.render()
 
+    def is_valid_action(self, action: ActType) -> bool:
+        """
+        Verifica si una acción es válida (es decir, no conduce a un obstáculo).
+        """
+        # Calcula la nueva posición basada en la acción
+        movement = {
+            0: np.array([0, 1]),  # Norte
+            1: np.array([0, -1]), # Sur
+            2: np.array([1, 0]),  # Este
+            3: np.array([-1, 0])  # Oeste
+        }
+        new_pos = self.agent_pos + movement[action]
+
+        # Verificar si la nueva posición está en los límites y no contiene un obstáculo
+        if self.is_within_bounds(new_pos) and not self.is_obstacle(new_pos):
+            return True
+        return False
+
+    def is_within_bounds(self, pos: np.ndarray) -> bool:
+        """
+        Verifica si la posición está dentro de los límites del entorno.
+        """
+        return 0 <= pos[0] < self.n_columns and 0 <= pos[1] < self.n_rows
+
+    def is_obstacle(self, pos: np.ndarray) -> bool:
+        """
+        Verifica si una posición específica contiene un obstáculo.
+        """
+        # Aquí se asume que tienes una lista o matriz de obstáculos
+        return tuple(pos) in self.obstacles_act  # `self.obstacles` debe ser definida como una lista o conjunto de coordenadas
 
     def step(self, action: ActType) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         
         self.steps_taken += 1
-
-        obs, reward, terminated, truncated, info = super().step(action)
+        
+        if self. phase >=6:
+            if self.is_valid_action(action):
+                obs, reward, terminated, truncated, info = super().step(action)
+            else:
+                # Mantener el estado actual si la acción no es válida
+                obs = self.get_observation()
+                reward = -1  # Puede ajustarse según las reglas del entorno
+                terminated = False
+                truncated = False
+                
+                info = {"message": "Invalid action; agent hit with an obstacle."}
+        else:
+            obs, reward, terminated, truncated, info = super().step(action)
         
         reward = self.calculate_reward()
         
@@ -162,8 +203,8 @@ class GridTargetEnv(GridBaseEnv):
                     self.episode = 1
                     
                     if (self.n_columns == 9 | self.n_rows == 9):  # Limite de grid de 10x10
-                        print(f"OBSTACLES FASE: N = {self.number_of_obstacles} ")
-                        self.number_of_obstacles += 1
+                        print(f"OBSTACLES FASE: N = {self.obstacle_fase} ")
+                        self.obstacle_fase += 1
                     else:
                         self.n_columns += 1   # MODIFICAMOS EL ROWS Y EL COLUMNS PERO TAMBIEN EL OBSERVATION SPACE!
                         self.n_rows += 1
@@ -183,6 +224,7 @@ class GridTargetEnv(GridBaseEnv):
     
     def calculate_reward(self):
         # Calcular la distancia de Manhattan entre el agente y el objetivo
+
         # Si el agente ha llegado al objetivo
         if self.is_target_reached():
             reward = 100
