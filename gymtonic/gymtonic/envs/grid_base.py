@@ -40,7 +40,7 @@ class GridBaseEnv(Env):
         self.action_space = spaces.Discrete(4)
                 
         # Discrete observation space of the size of the grid with 2 possible values (empty or agent)
-        self.observation_space = spaces.MultiDiscrete(np.array([2] * self.n_rows * self.n_columns, dtype=np.int32))
+        self.observation_space = spaces.MultiDiscrete(np.array([2] * self.max_rows * self.max_columns, dtype=np.int32))
         
         # Initialize agent's position at 0,0
         self.agent_pos = np.array([0, 0], dtype=np.int32)
