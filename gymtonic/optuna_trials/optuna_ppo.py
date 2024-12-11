@@ -21,7 +21,7 @@ def objective(trial):
     batch_size = trial.suggest_categorical("batch_size", [64, 128, 256])
 
     # Crear el entorno con Monitor
-    env = gym.make('gymtonic/GridTarget-v0', n_rows=8, n_columns=10)
+    env = gym.make('gymtonic/GridTarget-v0', n_rows=5, n_columns=5)
     env = Monitor(env)
 
     # Configurar PPO con los hiperparámetros sugeridos
@@ -39,22 +39,25 @@ def objective(trial):
     )
 
     # Entrenar el modelo
-    model.learn(total_timesteps=30_000)
+    model.learn(total_timesteps=5000)
 
     # Evaluar el modelo usando la función de Stable-Baselines3
-    mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=2, deterministic=True)
+    mean_reward, _ = evaluate_policy(model, env, n_eval_episodes=2, deterministic=False)
     
-    return mean_reward
+    phase= env.phase
+    phase_value = phase * 1000
+    
+    rew = phase_value + mean_reward 
+    
+    return rew
 
 
 if __name__ == "__main__":
     # Crear el entorno base (solo para reproducibilidad)
     seed = 42
     random.seed(seed)
-    env = gym.make('gymtonic/GridTarget-v0', n_rows=6, n_columns=6)
+    env = gym.make('gymtonic/GridTarget-v0', n_rows=5, n_columns=5)
     env.reset(seed=seed)
-
-
 
     # Configuración de Optuna
     study_name = "gridtarget_ppo"
@@ -80,12 +83,12 @@ if __name__ == "__main__":
     )
 
     # Ejecutar la optimización
-    n_trials = 2
+    n_trials = 50
     print(f"Buscando los mejores hiperparámetros en {n_trials} pruebas...")
     study.optimize(objective, n_trials=n_trials)
 
     # Guardar los mejores resultados en un archivo JSON
-    best_trials = sorted(study.get_trials(), key=lambda t: t.value, reverse=True)[:1]
+    best_trials = sorted(study.get_trials(), key=lambda t: t.value, reverse=True)[:3]
     best_trials_params = {
         f"trial_{i+1}": {
             "value": trial.value,
